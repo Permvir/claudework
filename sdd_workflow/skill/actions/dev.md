@@ -1,4 +1,3 @@
-<!-- Purpose: Create a dev branch, implement code changes, and write tests based on the issue spec. -->
 # Action: dev
 
 创建分支、开发代码、编写测试。
@@ -25,9 +24,9 @@
    BRANCH_NAME=$(bash <skill_dir>/scripts/config.sh --get-branch-name "<type>" "<issue_iid>")
    BASE_BRANCH=$(bash <skill_dir>/scripts/config.sh --get-base-branch "<type>")
    ```
-   - `dev` 类型 → 基线由自动检测决定，分支名前缀跟随基线（有 dev 时为 `dev-alice-8`，无 dev 回退 master 时为 `master-alice-8`）
-   - `hotfix` 类型 → 基线 `master`，分支名如 `hotfix-alice-8`
-   - `feature` 类型 → 基线 `master`，分支名如 `feature-alice-8`
+   - `dev` 类型 → 基线由自动检测决定，分支名前缀跟随基线（有 dev 时为 `dev-ocean-8`，无 dev 回退 master 时为 `master-ocean-8`）
+   - `hotfix` 类型 → 基线 `master`，分支名如 `hotfix-ocean-8`
+   - `feature` 类型 → 基线 `master`，分支名如 `feature-ocean-8`
 
 4. **创建开发分支**：
    ```bash
@@ -46,7 +45,7 @@
    ```
    分支已创建：
      类型: dev
-     分支名: dev-alice-8
+     分支名: dev-ocean-8
      基线: origin/dev
      MR 目标: dev
    ```

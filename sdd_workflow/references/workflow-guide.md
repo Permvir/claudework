@@ -1,5 +1,3 @@
-English version: [workflow-guide.en.md](workflow-guide.en.md)
-
 # SDD 工作流阶段指南
 
 ## 概览

@@ -11,13 +11,6 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/config.sh"
 
-# ── 语言检测 ──
-if [[ "${LANG:-}" != zh_CN* && "${LANG:-}" != zh_TW* ]]; then
-  _SDD_LANG=en
-else
-  _SDD_LANG=zh
-fi
-
 TEMPLATE_DIR="${SCRIPT_DIR}/../templates"
 
 # ─── MR 描述生成 ──────────────────────────────────────────
@@ -79,21 +72,13 @@ batch_notify_reviewers() {
 
         local user_info
         if ! user_info=$(bash "${SCRIPT_DIR}/gitlab-api.sh" resolve-user-id "${project_id}" "${username}" 2>/dev/null); then
-            if [[ "${_SDD_LANG}" == "en" ]]; then
-                echo "⚠ Reviewer @${username}: resolve-user-id failed, skipping" >&2
-            else
-                echo "⚠ Reviewer @${username}: resolve-user-id 失败，跳过" >&2
-            fi
+            echo "⚠ Reviewer @${username}: resolve-user-id 失败，跳过" >&2
             continue
         fi
 
         local user_id
         if ! user_id=$(echo "${user_info}" | python3 "${SCRIPT_DIR}/json-helper.py" get-field user_id 2>/dev/null) || [[ -z "${user_id}" ]]; then
-            if [[ "${_SDD_LANG}" == "en" ]]; then
-                echo "⚠ Reviewer @${username} not a project member, skipped" >&2
-            else
-                echo "⚠ Reviewer @${username} 不在项目成员中，已跳过" >&2
-            fi
+            echo "⚠ Reviewer @${username} 不在项目成员中，已跳过" >&2
             continue
         fi
 
@@ -110,32 +95,19 @@ batch_notify_reviewers() {
         local _reviewer_err
         if ! _reviewer_err=$(bash "${SCRIPT_DIR}/gitlab-api.sh" set-mr-reviewers \
             "${project_id}" "${mr_iid}" "${ids_csv}" 2>&1); then
-            if [[ "${_SDD_LANG}" == "en" ]]; then
-                echo "⚠ set-mr-reviewers failed: ${_reviewer_err}" >&2
-            else
-                echo "⚠ set-mr-reviewers 失败: ${_reviewer_err}" >&2
-            fi
+            echo "⚠ set-mr-reviewers 失败: ${_reviewer_err}" >&2
         fi
 
         # 单条评论 @提醒所有 reviewer
         local mentions="${mention_parts[*]}"
-        local note
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            note="${mentions} Please review this MR. This MR was auto-created by the SDD workflow. The linked issue contains the full spec and acceptance criteria."
-        else
-            note="${mentions} 请 review 此 MR。此 MR 由 SDD 工作流自动创建，关联 issue 中包含完整的需求规范和验收标准。"
-        fi
+        local note="${mentions} 请 review 此 MR。此 MR 由 SDD 工作流自动创建，关联 issue 中包含完整的需求规范和验收标准。"
 
         bash "${SCRIPT_DIR}/gitlab-api.sh" add-mr-note \
             "${project_id}" \
             "${mr_iid}" \
             "${note}"
     else
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            echo "⚠ No reviewers resolved, skipping notification" >&2
-        else
-            echo "⚠ 未成功解析任何 reviewer，跳过通知" >&2
-        fi
+        echo "⚠ 未成功解析任何 reviewer，跳过通知" >&2
     fi
 }
 
@@ -147,19 +119,15 @@ main() {
 
     case "${action}" in
         create)
-            [[ $# -ge 5 ]] || { if [[ "${_SDD_LANG}" == "en" ]]; then echo "Usage: mr-helper.sh create <project_id> <issue_iid> <issue_title> <source_branch> <target_branch> [description_file] [rm_branch]" >&2; else echo "用法: mr-helper.sh create <project_id> <issue_iid> <issue_title> <source_branch> <target_branch> [description_file] [rm_branch]" >&2; fi; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 5 ]] || { echo "用法: mr-helper.sh create <project_id> <issue_iid> <issue_title> <source_branch> <target_branch> [description_file] [rm_branch]" >&2; exit ${SDD_EXIT_VALIDATION}; }
             create_mr_for_issue "$@"
             ;;
         batch-notify-reviewers)
-            [[ $# -ge 3 ]] || { if [[ "${_SDD_LANG}" == "en" ]]; then echo "Usage: mr-helper.sh batch-notify-reviewers <project_id> <mr_iid> <usernames>" >&2; else echo "用法: mr-helper.sh batch-notify-reviewers <project_id> <mr_iid> <usernames>" >&2; fi; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 3 ]] || { echo "用法: mr-helper.sh batch-notify-reviewers <project_id> <mr_iid> <usernames>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             batch_notify_reviewers "$1" "$2" "$3"
             ;;
         *)
-            if [[ "${_SDD_LANG}" == "en" ]]; then
-                echo "Usage: mr-helper.sh <action> [args...]" >&2
-            else
-                echo "用法: mr-helper.sh <action> [args...]" >&2
-            fi
+            echo "用法: mr-helper.sh <action> [args...]" >&2
             echo "" >&2
             echo "Actions:" >&2
             echo "  create <project_id> <issue_iid> <title> <source> <target> [desc_file] [rm_branch]" >&2

@@ -1,4 +1,3 @@
-<!-- Purpose: Output the SDD issue spec template for creating new issues. -->
 # Action: template
 
 输出 SDD issue 规范模板。

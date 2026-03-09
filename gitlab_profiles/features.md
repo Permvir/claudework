@@ -1,5 +1,3 @@
-English version: [features.en.md](features.en.md)
-
 # GitLab 多账户切换
 
 在同一个 GitLab 实例上方便地切换多个账户，仅影响当前 shell session。`gitlab-use` 命令一键切换，同时覆盖 SDD 工作流和 git push 的认证身份。
@@ -56,7 +54,7 @@ gitlab-use
 # 当前: alice
 # 可用 profiles:
 #   * alice  (active)
-#     zhangsan
+#     charlie
 #
 # 命令: gitlab-use <name> | add | remove <name> | info [name]
 ```
@@ -73,7 +71,7 @@ gitlab-use
 
 ```bash
 gitlab-use alice
-# Switched to GitLab profile: alice (https://code.gitlab.example.com)
+# Switched to GitLab profile: alice (http://gitlab.example.com)
 ```
 
 切换时会自动验证 Token 有效性，失败时给出警告但仍完成切换。
@@ -92,15 +90,15 @@ gitlab-use alice
 gitlab-use add
 # === 添加新 GitLab Profile ===
 #
-# Profile 名称: zhangsan
-# GitLab URL [https://code.gitlab.example.com]:
+# Profile 名称: charlie
+# GitLab URL [http://gitlab.example.com]:
 # Personal Access Token (api scope): glpat-xxxxxxxxxxxx
-# 验证 Token... ✓ 有效 (用户: zhangsan)
-# 开发者名称 [zhangsan]:
-# Git 邮箱 [zhangsan@gitlab.example.com]:
+# 验证 Token... ✓ 有效 (用户: charlie)
+# 开发者名称 [charlie]:
+# Git 邮箱 [charlie@example.com]:
 #
-# ✓ Profile 'zhangsan' 已创建
-#   使用 gitlab-use zhangsan 切换
+# ✓ Profile 'charlie' 已创建
+#   使用 gitlab-use charlie 切换
 ```
 
 交互式引导输入，自动验证 Token 有效性并从 GitLab API 获取用户名。
@@ -108,8 +106,8 @@ gitlab-use add
 ### 删除 profile
 
 ```bash
-gitlab-use remove zhangsan
-# ✓ Profile 'zhangsan' 已删除
+gitlab-use remove charlie
+# ✓ Profile 'charlie' 已删除
 ```
 
 不允许删除当前激活的 profile，需先切换到其他 profile 再删除。
@@ -120,15 +118,15 @@ gitlab-use remove zhangsan
 gitlab-use info
 # === Profile: alice ===
 # 状态:       ✓ 激活中
-# GitLab URL: https://code.gitlab.example.com
+# GitLab URL: http://gitlab.example.com
 # Token:      glpat-xxxx...xxxx
 # 开发者:     alice
-# 邮箱:       alice@gitlab.example.com
+# 邮箱:       alice@example.com
 # Token 状态: ✓ 有效
 ```
 
 ```bash
-gitlab-use info zhangsan    # 查看指定 profile（不需要激活）
+gitlab-use info charlie    # 查看指定 profile（不需要激活）
 ```
 
 ### 直接 source
@@ -149,7 +147,7 @@ source ~/.claude/gitlab-profiles/alice.sh
 
 ```bash
 gitlab-use bob                                      # 1. 先切换账户
-git clone https://code.gitlab.example.com/group/repo.git          # 2. 再 clone，认证自动完成
+git clone http://gitlab.example.com/group/repo.git          # 2. 再 clone，认证自动完成
 ```
 
 > **顺序很重要**：`git clone` 本身就需要认证，必须先 `gitlab-use` 再 clone。若先 clone 私有仓库再切换账户，clone 会因认证失败而报错。
@@ -159,13 +157,13 @@ git clone https://code.gitlab.example.com/group/repo.git          # 2. 再 clone
 若仓库已通过 SSH 方式 checkout，**不需要重新 checkout**，直接改 remote URL 即可：
 
 ```bash
-git remote set-url origin https://code.gitlab.example.com/mygroup/myproject.git
+git remote set-url origin http://gitlab.example.com/group/project.git
 ```
 
 改完后验证 credential helper 是否生效：
 
 ```bash
-echo -e "host=code.gitlab.example.com\nprotocol=https" | git credential fill
+echo -e "host=gitlab.example.com\nprotocol=https" | git credential fill
 # 预期输出包含 username=bob 和 password=<token>
 ```
 
@@ -252,7 +250,7 @@ echo "DEVELOPER_NAME: ${DEVELOPER_NAME}"
 echo "GITLAB_URL: ${GITLAB_URL}"
 
 # 8. 验证 git push 认证
-echo -e "host=code.gitlab.example.com\nprotocol=https" | git credential fill
+echo -e "host=gitlab.example.com\nprotocol=https" | git credential fill
 # 预期输出包含 username=alice 和 password=<token>
 
 # 9. 删除测试 profile

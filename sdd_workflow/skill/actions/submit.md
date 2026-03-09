@@ -1,4 +1,3 @@
-<!-- Purpose: Push code, review changes locally, auto-create MR(s), and set reviewers. -->
 # Action: submit
 
 推送代码、review 变更、自动创建 MR 并设置 reviewer。
@@ -8,6 +7,8 @@
 ```
 /sdd submit <issue_url>
 /sdd submit --type=hotfix <issue_url>
+/sdd submit --reviewer=user1,user2 <issue_url>
+/sdd submit --type=hotfix --reviewer=user1,user2 <issue_url>
 ```
 
 ## 步骤
@@ -17,7 +18,7 @@
 2. **检测分支类型**：从当前分支名自动识别类型（反向匹配，因为 dev 类型前缀是动态的）：
    - 以 `hotfix-` 开头 → hotfix 类型
    - 以 `feature-` 开头 → feature 类型
-   - 其余一律 → dev 类型（dev 类型前缀跟随基线分支名，如 `dev-alice-8` 或 `master-alice-8`）
+   - 其余一律 → dev 类型（dev 类型前缀跟随基线分支名，如 `dev-ocean-8` 或 `master-ocean-8`）
    - 用户通过 `--type` 显式指定时，以用户指定为准
    - MR 主目标由 `get_primary_mr_target("<type>")` 函数决定：dev 类型返回 `DEFAULT_BASE_BRANCH`，hotfix/feature 类型返回 `master`
 
@@ -119,9 +120,12 @@
    **双 MR 场景异常处理**：如果 MR1（→dev）创建成功但 MR2（→master）创建失败，向用户展示错误信息和已创建的 MR1 URL，提示用户手动创建 MR2 或排查权限问题后重试。流程继续执行后续步骤（设置 Reviewer 等）仅针对已成功创建的 MR。
 
    **设置 Reviewer**（创建 MR 后立即执行）：
-   - 将 issue 的 `description` 传给 `bash <skill_dir>/scripts/issue-parser.sh`，从解析结果的 `reviewer_list` 字段提取 reviewer 用户名列表
-   - 将用户名用逗号拼接，对每个已创建的 MR 调用 `bash <skill_dir>/scripts/mr-helper.sh batch-notify-reviewers <project_id> <mr_iid> "<username1,username2,...>"`
-   - 一次性设置所有 reviewer 并发送单条 @mention 评论
+   - **Reviewer 优先级**：
+     1. 命令行 `--reviewer=user1,user2` 参数（最高优先级）
+     2. issue 描述的 `## Reviewer` 章节（`reviewer_list` 字段，通过 `bash <skill_dir>/scripts/issue-parser.sh` 解析）
+     3. 无 reviewer（不设置，由提交人自行 review）
+   - 若确定了 reviewer 列表，对每个已创建的 MR 调用 `bash <skill_dir>/scripts/mr-helper.sh batch-notify-reviewers <project_id> <mr_iid> "<username1,username2,...>"`，一次性设置所有 reviewer 并发送单条 @mention 评论
+   - 若无 reviewer（优先级 1 和 2 均未提供），跳过此步骤，不调用 API，MR 创建成功后在输出中注明"未设置 Reviewer，由提交人自行 review"
 
 11. **输出创建结果**：
 

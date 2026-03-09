@@ -186,9 +186,9 @@ class TestDescriptionPayload(unittest.TestCase):
 
 class TestMrPayload(unittest.TestCase):
     def test_full(self):
-        r = run_helper('mr-payload', ['dev-alice-8', 'dev', 'Resolve "title"', 'true', 'true'], stdin_data='MR desc')
+        r = run_helper('mr-payload', ['dev-ocean-8', 'dev', 'Resolve "title"', 'true', 'true'], stdin_data='MR desc')
         data = json.loads(r.stdout)
-        self.assertEqual(data['source_branch'], 'dev-alice-8')
+        self.assertEqual(data['source_branch'], 'dev-ocean-8')
         self.assertEqual(data['target_branch'], 'dev')
         self.assertEqual(data['title'], 'Resolve "title"')
         self.assertEqual(data['description'], 'MR desc')
@@ -289,7 +289,7 @@ class TestRenderMrTemplate(unittest.TestCase):
         r = run_helper('render-mr-template', [self.TEMPLATE_FILE, '8', 'Test Title'])
         self.assertEqual(r.returncode, 0)
         self.assertIn('Closes #8', r.stdout)
-        self.assertTrue('（待填写）' in r.stdout or '(to be filled)' in r.stdout)
+        self.assertIn('（待填写）', r.stdout)
 
     def test_with_description_file(self):
         import tempfile
@@ -313,7 +313,7 @@ class TestRenderMrTemplate(unittest.TestCase):
     def test_missing_description_file(self):
         r = run_helper('render-mr-template', [self.TEMPLATE_FILE, '5', 'Title', '/nonexistent/desc.md'])
         self.assertEqual(r.returncode, 0)
-        self.assertTrue('（待填写）' in r.stdout or '(to be filled)' in r.stdout)
+        self.assertIn('（待填写）', r.stdout)
 
     def test_missing_args(self):
         r = run_helper('render-mr-template', [self.TEMPLATE_FILE])
@@ -343,6 +343,191 @@ class TestGetField(unittest.TestCase):
     def test_no_args(self):
         r = run_helper('get-field', stdin_data='{}')
         self.assertNotEqual(r.returncode, 0)
+
+
+class TestGetProjectNamespace(unittest.TestCase):
+    def test_group_namespace(self):
+        inp = json.dumps({
+            'path': 'my-repo',
+            'namespace': {'id': 10, 'kind': 'group'}
+        })
+        r = run_helper('get-project-namespace', stdin_data=inp)
+        self.assertEqual(r.returncode, 0)
+        data = json.loads(r.stdout)
+        self.assertEqual(data['namespace_id'], 10)
+        self.assertEqual(data['namespace_kind'], 'group')
+        self.assertEqual(data['repo_name'], 'my-repo')
+
+    def test_user_namespace(self):
+        inp = json.dumps({
+            'path': 'personal-repo',
+            'namespace': {'id': 5, 'kind': 'user'}
+        })
+        r = run_helper('get-project-namespace', stdin_data=inp)
+        self.assertEqual(r.returncode, 0)
+        data = json.loads(r.stdout)
+        self.assertEqual(data['namespace_kind'], 'user')
+
+    def test_missing_namespace(self):
+        inp = json.dumps({'path': 'repo'})
+        r = run_helper('get-project-namespace', stdin_data=inp)
+        self.assertEqual(r.returncode, 0)
+        data = json.loads(r.stdout)
+        self.assertEqual(data['namespace_kind'], '')
+        self.assertIsNone(data['namespace_id'])
+
+    def test_invalid_json(self):
+        r = run_helper('get-project-namespace', stdin_data='not json')
+        self.assertNotEqual(r.returncode, 0)
+
+
+class TestParseWikiLabels(unittest.TestCase):
+    WIKI_CONTENT = (
+        "# 系统标签映射\n"
+        "## 系统::发薪系统\n"
+        "- tezzolo-finance-frontend\n"
+        "- tezzolo-finance\n"
+        "\n"
+        "## 系统::会员系统\n"
+        "- shanks-manage\n"
+    )
+
+    def _make_wiki_json(self, content):
+        return json.dumps({'content': content})
+
+    def test_single_match(self):
+        r = run_helper('parse-wiki-labels', ['shanks-manage'],
+                       stdin_data=self._make_wiki_json(self.WIKI_CONTENT))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), '系统::会员系统')
+
+    def test_no_match(self):
+        r = run_helper('parse-wiki-labels', ['unknown-repo'],
+                       stdin_data=self._make_wiki_json(self.WIKI_CONTENT))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), '')
+
+    def test_multiple_labels_for_repo(self):
+        content = "## label-a\n- shared-repo\n## label-b\n- shared-repo\n"
+        r = run_helper('parse-wiki-labels', ['shared-repo'],
+                       stdin_data=self._make_wiki_json(content))
+        self.assertEqual(r.returncode, 0)
+        labels = r.stdout.strip().split(',')
+        self.assertIn('label-a', labels)
+        self.assertIn('label-b', labels)
+
+    def test_empty_content(self):
+        r = run_helper('parse-wiki-labels', ['any-repo'],
+                       stdin_data=self._make_wiki_json(''))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), '')
+
+    def test_missing_arg(self):
+        r = run_helper('parse-wiki-labels')
+        self.assertEqual(r.returncode, 4)
+
+
+class TestParseWikiTypeLabel(unittest.TestCase):
+    WIKI_CONTENT = (
+        "# 系统标签映射\n"
+        "## 系统::发薪系统\n"
+        "- tezzolo-finance\n"
+        "\n"
+        "# 创建Issue type标签映射\n"
+        "## requirement\n"
+        "- requirement\n"
+        "\n"
+        "## bug\n"
+        "- bug\n"
+    )
+
+    def _make_wiki_json(self, content):
+        return json.dumps({'content': content})
+
+    def test_bug_type(self):
+        r = run_helper('parse-wiki-type-label', ['bug'],
+                       stdin_data=self._make_wiki_json(self.WIKI_CONTENT))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), 'bug')
+
+    def test_requirement_type(self):
+        r = run_helper('parse-wiki-type-label', ['requirement'],
+                       stdin_data=self._make_wiki_json(self.WIKI_CONTENT))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), 'requirement')
+
+    def test_unknown_type_returns_empty(self):
+        r = run_helper('parse-wiki-type-label', ['feature'],
+                       stdin_data=self._make_wiki_json(self.WIKI_CONTENT))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), '')
+
+    def test_case_insensitive_type(self):
+        r = run_helper('parse-wiki-type-label', ['BUG'],
+                       stdin_data=self._make_wiki_json(self.WIKI_CONTENT))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), 'bug')
+
+    def test_no_type_section_in_wiki(self):
+        content = "# 系统标签映射\n## 系统::X\n- repo\n"
+        r = run_helper('parse-wiki-type-label', ['bug'],
+                       stdin_data=self._make_wiki_json(content))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), '')
+
+    def test_stops_at_next_top_section(self):
+        # 在 type 章节之后又出现了新的 # 章节，确保不会越界读取
+        content = (
+            "# 创建Issue type标签映射\n"
+            "## bug\n"
+            "- bug\n"
+            "# 其他配置\n"
+            "## bug\n"
+            "- should-not-be-returned\n"
+        )
+        r = run_helper('parse-wiki-type-label', ['bug'],
+                       stdin_data=self._make_wiki_json(content))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), 'bug')
+
+    def test_multiple_labels_for_type(self):
+        content = (
+            "# 创建Issue type标签映射\n"
+            "## bug\n"
+            "- bug\n"
+            "- priority::triage\n"
+        )
+        r = run_helper('parse-wiki-type-label', ['bug'],
+                       stdin_data=self._make_wiki_json(content))
+        self.assertEqual(r.returncode, 0)
+        labels = r.stdout.strip().split(',')
+        self.assertIn('bug', labels)
+        self.assertIn('priority::triage', labels)
+
+    def test_empty_wiki(self):
+        r = run_helper('parse-wiki-type-label', ['bug'],
+                       stdin_data=self._make_wiki_json(''))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), '')
+
+    def test_system_labels_not_matched_as_type(self):
+        # 系统标签映射中的 ## 不应被 type 解析命中
+        content = (
+            "# 系统标签映射\n"
+            "## bug\n"          # 这个 bug 在系统标签区，不应被 type 解析命中
+            "- some-repo\n"
+            "# 创建Issue type标签映射\n"
+            "## requirement\n"
+            "- requirement\n"
+        )
+        r = run_helper('parse-wiki-type-label', ['bug'],
+                       stdin_data=self._make_wiki_json(content))
+        self.assertEqual(r.returncode, 0)
+        self.assertEqual(r.stdout.strip(), '')
+
+    def test_missing_arg(self):
+        r = run_helper('parse-wiki-type-label')
+        self.assertEqual(r.returncode, 4)
 
 
 class TestUnknownAction(unittest.TestCase):

@@ -1,4 +1,3 @@
-<!-- Purpose: Fetch and parse an issue, display a structured summary. -->
 # Action: read
 
 获取并解析 issue，展示结构化摘要。

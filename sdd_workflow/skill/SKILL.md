@@ -47,7 +47,7 @@ git remote get-url origin
 | **hotfix** | `master` | `dev`（同时需合 master） | `hotfix-{developer}-{issue_iid}` | 线上紧急 bug 修复或紧急功能 |
 | **feature** | `master` | `dev`（同时需合 master） | `feature-{developer}-{issue_iid}` | 紧急上线且周期短的新功能 |
 
-> **dev 类型命名规则**：分支前缀动态跟随实际基线分支名。有 dev 分支时为 `dev-alice-8`，无 dev 分支自动回退 master 时为 `master-alice-8`。hotfix/feature 始终使用固定前缀，不受此规则影响。
+> **dev 类型命名规则**：分支前缀动态跟随实际基线分支名。有 dev 分支时为 `dev-ocean-8`，无 dev 分支自动回退 master 时为 `master-ocean-8`。hotfix/feature 始终使用固定前缀，不受此规则影响。
 
 > **无 dev 分支的项目**：自动检测远程分支，若无 `dev` 分支则默认基线回退到 `master`。此时 dev 类型的基线和 MR 目标均为 `master`，hotfix/feature 的 MR 目标仅合到 `master`。适用于只有 master 分支的工具类项目，无需手动配置。
 
@@ -69,7 +69,7 @@ git remote get-url origin
 | `refine` | 读取 issue 中的问题和 TODO 标记，讨论后更新 issue 描述 |
 | `review` | 审查 issue spec 质量（传 issue URL）或审查 MR 代码变更（传 MR URL） |
 | `dev [--type=dev\|hotfix\|feature]` | 创建分支、开发代码、编写测试 |
-| `submit [--type=dev\|hotfix\|feature]` | 推送代码、review 变更、自动创建 MR 并设置 reviewer |
+| `submit [--type=dev\|hotfix\|feature] [--reviewer=user1,user2]` | 推送代码、review 变更、自动创建 MR 并设置 reviewer |
 | `done` | MR 合入后关闭 issue，自动更新标签为 `workflow::done` |
 | `update` | 添加 Issue 评论（开发进度、关键决策等） |
 | `link [--issue=N] <related_url> [desc]` | 向指定 issue 的「关联 Issue」栏目追加一条关联 URL |
@@ -77,6 +77,7 @@ git remote get-url origin
 | `status` | 展示当前 SDD 工作状态概览（分支、关联 issue、工作流阶段） |
 | `reopen` | 重新打开已关闭的 issue，标签回退为 `workflow::start` |
 | `assign [--clear] <username ...>` | 将 issue 指派给项目成员，`--clear` 清空指派人 |
+| `label [--label="<labels>"] [--remove="<labels>"]` | 为 issue 添加或移除标签 |
 | `list [project_url]` | 列出项目中带 `workflow::` 标签的 issue，按阶段分组展示 |
 
 ## 执行流程

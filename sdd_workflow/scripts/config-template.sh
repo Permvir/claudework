@@ -35,7 +35,7 @@ DEFAULT_BASE_BRANCH="dev"
 #   feature — 紧急上线且周期短的新功能，从 master 拉取，同时合到 dev 和 master（无 dev 分支时仅合 master）
 #
 # 命名模式中的变量：{base_branch} = 实际基线分支名, {developer} = 开发者名称, {issue_iid} = issue 编号, {description} = 简要描述
-# dev 类型前缀动态跟随基线：有 dev 分支时为 dev-alice-8，无 dev 回退 master 时为 master-alice-8
+# dev 类型前缀动态跟随基线：有 dev 分支时为 dev-ocean-8，无 dev 回退 master 时为 master-ocean-8
 BRANCH_PATTERN_DEV='{base_branch}-{developer}-{issue_iid}'
 BRANCH_PATTERN_HOTFIX='hotfix-{developer}-{issue_iid}'
 BRANCH_PATTERN_FEATURE='feature-{developer}-{issue_iid}'

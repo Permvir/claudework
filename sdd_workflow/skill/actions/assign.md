@@ -1,4 +1,3 @@
-<!-- Purpose: Assign an issue to one or more project members by username. -->
 # Action: assign
 
 将 issue 指派给一个或多个项目成员，支持按用户名模糊搜索。

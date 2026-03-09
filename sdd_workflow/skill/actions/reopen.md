@@ -1,4 +1,3 @@
-<!-- Purpose: Reopen a closed issue and reset its workflow label to workflow::start. -->
 # Action: reopen
 
 重新打开一个已关闭的 issue，并将标签回退到合适的工作流阶段。

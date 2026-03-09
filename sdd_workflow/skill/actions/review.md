@@ -1,4 +1,3 @@
-<!-- Purpose: Review an issue spec or MR code changes, output a structured review report. -->
 # Action: review
 
 `review` 根据传入的 URL 类型自动选择审查模式：

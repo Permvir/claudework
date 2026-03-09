@@ -20,7 +20,7 @@ assert_eq() {
 echo "--- test_config_functions.sh ---"
 
 # Setup: mock environment
-export DEVELOPER_NAME="alice"
+export DEVELOPER_NAME="ocean"
 export GITLAB_URL="http://gitlab.example.com"
 export GITLAB_TOKEN="test_token"
 # Set DEFAULT_BASE_BRANCH to non-"dev" to skip git ls-remote network call
@@ -32,9 +32,9 @@ source "${SCRIPT_DIR}/config.sh" 2>/dev/null || true
 
 # Test get_branch_name
 echo "get_branch_name:"
-assert_eq "dev type" "master-alice-8" "$(get_branch_name dev 8)"
-assert_eq "hotfix type" "hotfix-alice-8" "$(get_branch_name hotfix 8)"
-assert_eq "feature type" "feature-alice-8" "$(get_branch_name feature 8)"
+assert_eq "dev type" "master-ocean-8" "$(get_branch_name dev 8)"
+assert_eq "hotfix type" "hotfix-ocean-8" "$(get_branch_name hotfix 8)"
+assert_eq "feature type" "feature-ocean-8" "$(get_branch_name feature 8)"
 
 # Test get_base_branch
 echo "get_base_branch:"

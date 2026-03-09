@@ -28,6 +28,8 @@
 #   reopen-issue <project_id> <issue_iid>  — 重新打开已关闭的 issue
 #   list-project-issues <project_id> [state] [labels] — 获取项目 issue 列表（可选按状态和标签过滤）
 #   update-issue-assignees <project_id> <issue_iid> <user_ids> — 设置 issue 指派人（逗号分隔的 user id）
+#   get-project-namespace <project_id>       — 获取项目的 namespace 信息（group_id、kind、repo_name）
+#   get-group-wiki-page <group_id> <slug>    — 获取 Group Wiki 页面内容
 
 set -euo pipefail
 
@@ -41,13 +43,6 @@ readonly SDD_EXIT_GIT=5
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/config.sh"
-
-# ── 语言检测 ──
-if [[ "${LANG:-}" != zh_CN* && "${LANG:-}" != zh_TW* ]]; then
-  _SDD_LANG=en
-else
-  _SDD_LANG=zh
-fi
 
 # ─── curl 能力检测 ────────────────────────────────────────────
 # --fail-with-body 需要 curl >= 7.76.0，旧版本降级为 --fail
@@ -63,21 +58,9 @@ fi
 
 # ─── 辅助函数 ──────────────────────────────────────────────
 
-_sdd_usage() {
-    if [[ "${_SDD_LANG}" == "en" ]]; then
-        echo "Usage: $*" >&2
-    else
-        echo "用法: $*" >&2
-    fi
-}
-
 _check_token() {
     if [[ -z "${GITLAB_TOKEN}" || "${GITLAB_TOKEN}" == "YOUR_TOKEN_HERE" ]]; then
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            echo '{"error": "GITLAB_TOKEN not configured. Edit ~/.claude/sdd-config.sh"}' >&2
-        else
-            echo '{"error": "GITLAB_TOKEN 未配置，请编辑 ~/.claude/sdd-config.sh"}' >&2
-        fi
+        echo '{"error": "GITLAB_TOKEN 未配置，请编辑 ~/.claude/sdd-config.sh"}' >&2
         exit ${SDD_EXIT_CONFIG}
     fi
 }
@@ -115,11 +98,7 @@ _api() {
 
         # 仅在 5xx 或 curl 超时（exit 28）时重试一次
         if [[ ${_attempt} -eq 1 ]] && { [[ "${_http_code}" =~ ^5[0-9]{2}$ ]] || [[ ${_exit_code} -eq 28 ]]; }; then
-            if [[ "${_SDD_LANG}" == "en" ]]; then
-                echo "⚠ SDD API: ${method} ${endpoint} failed (HTTP ${_http_code}, exit ${_exit_code}), retrying in 2s..." >&2
-            else
-                echo "⚠ SDD API: ${method} ${endpoint} 失败（HTTP ${_http_code}，exit ${_exit_code}），2 秒后重试..." >&2
-            fi
+            echo "⚠ SDD API: ${method} ${endpoint} 失败（HTTP ${_http_code}，exit ${_exit_code}），2 秒后重试..." >&2
             sleep 2
             continue
         fi
@@ -131,11 +110,7 @@ _api() {
         local _curl_err
         _curl_err=$(<"${_curl_stderr_file}" 2>/dev/null) || true
         [[ -n "${_curl_err}" ]] && echo "curl: ${_curl_err}" >&2
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            echo "⚠ SDD: ${method} ${endpoint} failed (HTTP ${_http_code}, curl exit ${_exit_code})" >&2
-        else
-            echo "⚠ SDD: ${method} ${endpoint} 失败（HTTP ${_http_code}，curl exit ${_exit_code}）" >&2
-        fi
+        echo "⚠ SDD: ${method} ${endpoint} 失败（HTTP ${_http_code}，curl exit ${_exit_code}）" >&2
         rm -f "${_curl_stderr_file}" 2>/dev/null
         return ${SDD_EXIT_API}
     fi
@@ -166,11 +141,7 @@ _api_paginated() {
             # 首页失败直接返回错误
             [[ ${page} -eq 1 ]] && return 1
             # 非首页失败：输出警告并返回已获取的部分数据
-            if [[ "${_SDD_LANG}" == "en" ]]; then
-                echo "⚠ SDD: Page ${page} request failed, returning first $((page - 1)) page(s) of data" >&2
-            else
-                echo "⚠ SDD: 分页请求第 ${page} 页失败，返回前 $((page - 1)) 页数据" >&2
-            fi
+            echo "⚠ SDD: 分页请求第 ${page} 页失败，返回前 $((page - 1)) 页数据" >&2
             break
         fi
 
@@ -187,11 +158,7 @@ _api_paginated() {
         page=$((page + 1))
         # 安全上限，防止无限循环
         if [[ ${page} -gt 10 ]]; then
-            if [[ "${_SDD_LANG}" == "en" ]]; then
-                echo "⚠ SDD: Pagination exceeded 10 pages (${page}00+ records), truncated" >&2
-            else
-                echo "⚠ SDD: 分页超过 10 页（${page}00+ 条记录），已截断" >&2
-            fi
+            echo "⚠ SDD: 分页超过 10 页（${page}00+ 条记录），已截断" >&2
             break
         fi
     done
@@ -229,11 +196,7 @@ resolve_project_id() {
     local encoded response
     encoded=$(_url_encode "${project_path}")
     if ! response=$(_api GET "/projects/${encoded}"); then
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            echo "{\"error\": \"Cannot get project info: ${project_path}\"}" >&2
-        else
-            echo "{\"error\": \"无法获取项目信息: ${project_path}\"}" >&2
-        fi
+        echo "{\"error\": \"无法获取项目信息: ${project_path}\"}" >&2
         return ${SDD_EXIT_API}
     fi
     echo "${response}" | python3 "${SCRIPT_DIR}/json-helper.py" resolve-project
@@ -350,11 +313,7 @@ resolve_user_id() {
     local encoded_username response
     encoded_username=$(_url_encode "${username}")
     if ! response=$(_api GET "/projects/${project_id}/members/all?search=${encoded_username}&per_page=20"); then
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            echo "{\"error\": \"Cannot query project member: ${username}\"}" >&2
-        else
-            echo "{\"error\": \"无法查询项目成员: ${username}\"}" >&2
-        fi
+        echo "{\"error\": \"无法查询项目成员: ${username}\"}" >&2
         return ${SDD_EXIT_API}
     fi
     echo "${response}" | python3 "${SCRIPT_DIR}/json-helper.py" find-member "${username}"
@@ -424,6 +383,24 @@ list_project_issues() {
     _api_paginated GET "${endpoint}"
 }
 
+get_project_namespace() {
+    local project_id="$1"
+    local response
+    if ! response=$(_api GET "/projects/${project_id}"); then
+        echo "{\"error\": \"无法获取项目信息: ${project_id}\"}" >&2
+        return ${SDD_EXIT_API}
+    fi
+    echo "${response}" | python3 "${SCRIPT_DIR}/json-helper.py" get-project-namespace
+}
+
+get_group_wiki_page() {
+    local group_id="$1"
+    local slug="$2"
+    local encoded
+    encoded=$(_url_encode "${slug}")
+    _api GET "/groups/${group_id}/wikis/${encoded}"
+}
+
 update_issue_assignees() {
     local project_id="$1"
     local issue_iid="$2"
@@ -444,17 +421,17 @@ main() {
 
     case "${action}" in
         parse-issue-url)
-            [[ $# -ge 1 ]] || { _sdd_usage "gitlab-api.sh parse-issue-url <url>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 1 ]] || { echo "用法: gitlab-api.sh parse-issue-url <url>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             parse_issue_url "$1"
             exit 0
             ;;
         parse-mr-url)
-            [[ $# -ge 1 ]] || { _sdd_usage "gitlab-api.sh parse-mr-url <url>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 1 ]] || { echo "用法: gitlab-api.sh parse-mr-url <url>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             parse_mr_url "$1"
             exit 0
             ;;
         parse-project-url)
-            [[ $# -ge 1 ]] || { _sdd_usage "gitlab-api.sh parse-project-url <url>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 1 ]] || { echo "用法: gitlab-api.sh parse-project-url <url>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             parse_project_url "$1"
             exit 0
             ;;
@@ -464,150 +441,130 @@ main() {
 
     case "${action}" in
         resolve-project-id)
-            [[ $# -ge 1 ]] || { _sdd_usage "gitlab-api.sh resolve-project-id <project_path>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 1 ]] || { echo "用法: gitlab-api.sh resolve-project-id <project_path>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             resolve_project_id "$1"
             ;;
         get-issue)
-            [[ $# -ge 2 ]] || { _sdd_usage "gitlab-api.sh get-issue <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh get-issue <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             get_issue "$1" "$2"
             ;;
         create-issue)
-            [[ $# -ge 3 ]] || { _sdd_usage "gitlab-api.sh create-issue <project_id> <title> <description> [labels]" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 3 ]] || { echo "用法: gitlab-api.sh create-issue <project_id> <title> <description> [labels]" >&2; exit ${SDD_EXIT_VALIDATION}; }
             create_issue "$@"
             ;;
         get-issue-notes)
-            [[ $# -ge 2 ]] || { _sdd_usage "gitlab-api.sh get-issue-notes <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh get-issue-notes <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             get_issue_notes "$1" "$2"
             ;;
         add-issue-note)
-            [[ $# -ge 3 ]] || { _sdd_usage "gitlab-api.sh add-issue-note <project_id> <issue_iid> <body>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 3 ]] || { echo "用法: gitlab-api.sh add-issue-note <project_id> <issue_iid> <body>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             add_issue_note "$1" "$2" "$3"
             ;;
         update-issue-labels)
-            [[ $# -ge 3 ]] || { _sdd_usage "gitlab-api.sh update-issue-labels <project_id> <issue_iid> <add_labels> [remove_labels]" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 3 ]] || { echo "用法: gitlab-api.sh update-issue-labels <project_id> <issue_iid> <add_labels> [remove_labels]" >&2; exit ${SDD_EXIT_VALIDATION}; }
             update_issue_labels "$@"
             ;;
         update-issue-description)
-            [[ $# -ge 3 ]] || { _sdd_usage "gitlab-api.sh update-issue-description <project_id> <issue_iid> <description>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 3 ]] || { echo "用法: gitlab-api.sh update-issue-description <project_id> <issue_iid> <description>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             update_issue_description "$1" "$2" "$3"
             ;;
         create-mr)
-            [[ $# -ge 5 ]] || { _sdd_usage "gitlab-api.sh create-mr <project_id> <source> <target> <title> <description> [remove_source_branch]" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 5 ]] || { echo "用法: gitlab-api.sh create-mr <project_id> <source> <target> <title> <description> [remove_source_branch]" >&2; exit ${SDD_EXIT_VALIDATION}; }
             create_mr "$1" "$2" "$3" "$4" "$5" "${6:-}"
             ;;
         get-mr)
-            [[ $# -ge 2 ]] || { _sdd_usage "gitlab-api.sh get-mr <project_id> <mr_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh get-mr <project_id> <mr_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             get_mr "$1" "$2"
             ;;
         get-mr-changes)
-            [[ $# -ge 2 ]] || { _sdd_usage "gitlab-api.sh get-mr-changes <project_id> <mr_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh get-mr-changes <project_id> <mr_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             get_mr_changes "$1" "$2"
             ;;
         add-mr-note)
-            [[ $# -ge 3 ]] || { _sdd_usage "gitlab-api.sh add-mr-note <project_id> <mr_iid> <body>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 3 ]] || { echo "用法: gitlab-api.sh add-mr-note <project_id> <mr_iid> <body>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             add_mr_note "$1" "$2" "$3"
             ;;
         set-mr-reviewers)
-            [[ $# -ge 3 ]] || { _sdd_usage "gitlab-api.sh set-mr-reviewers <project_id> <mr_iid> <reviewer_ids>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 3 ]] || { echo "用法: gitlab-api.sh set-mr-reviewers <project_id> <mr_iid> <reviewer_ids>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             set_mr_reviewers "$1" "$2" "$3"
             ;;
         resolve-user-id)
-            [[ $# -ge 2 ]] || { _sdd_usage "gitlab-api.sh resolve-user-id <project_id> <username>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh resolve-user-id <project_id> <username>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             resolve_user_id "$1" "$2"
             ;;
         get-project-members)
-            [[ $# -ge 1 ]] || { _sdd_usage "gitlab-api.sh get-project-members <project_id>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 1 ]] || { echo "用法: gitlab-api.sh get-project-members <project_id>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             get_project_members "$1"
             ;;
         close-issue)
-            [[ $# -ge 2 ]] || { _sdd_usage "gitlab-api.sh close-issue <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh close-issue <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             close_issue "$1" "$2"
             ;;
         list-issue-related-mrs)
-            [[ $# -ge 2 ]] || { _sdd_usage "gitlab-api.sh list-issue-related-mrs <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh list-issue-related-mrs <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             list_issue_related_mrs "$1" "$2"
             ;;
         reopen-issue)
-            [[ $# -ge 2 ]] || { _sdd_usage "gitlab-api.sh reopen-issue <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh reopen-issue <project_id> <issue_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             reopen_issue "$1" "$2"
             ;;
         update-issue-assignees)
-            [[ $# -ge 3 ]] || { _sdd_usage "gitlab-api.sh update-issue-assignees <project_id> <issue_iid> <user_ids>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 3 ]] || { echo "用法: gitlab-api.sh update-issue-assignees <project_id> <issue_iid> <user_ids>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             update_issue_assignees "$1" "$2" "$3"
             ;;
+        get-project-namespace)
+            [[ $# -ge 1 ]] || { echo "用法: gitlab-api.sh get-project-namespace <project_id>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            get_project_namespace "$1"
+            ;;
+        get-group-wiki-page)
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh get-group-wiki-page <group_id> <slug>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            get_group_wiki_page "$1" "$2"
+            ;;
         list-project-mrs)
-            [[ $# -ge 3 ]] || { _sdd_usage "gitlab-api.sh list-project-mrs <project_id> <source_branch> <target_branch> [state]" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 3 ]] || { echo "用法: gitlab-api.sh list-project-mrs <project_id> <source_branch> <target_branch> [state]" >&2; exit ${SDD_EXIT_VALIDATION}; }
             list_project_mrs "$1" "$2" "$3" "${4:-}"
             ;;
         list-project-issues)
-            [[ $# -ge 1 ]] || { _sdd_usage "gitlab-api.sh list-project-issues <project_id> [state] [labels]" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 1 ]] || { echo "用法: gitlab-api.sh list-project-issues <project_id> [state] [labels]" >&2; exit ${SDD_EXIT_VALIDATION}; }
             list_project_issues "$1" "${2:-}" "${3:-}"
             ;;
         get-mr-notes)
-            [[ $# -ge 2 ]] || { _sdd_usage "gitlab-api.sh get-mr-notes <project_id> <mr_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 2 ]] || { echo "用法: gitlab-api.sh get-mr-notes <project_id> <mr_iid>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             get_mr_notes "$1" "$2"
             ;;
         update-mr-note)
-            [[ $# -ge 4 ]] || { _sdd_usage "gitlab-api.sh update-mr-note <project_id> <mr_iid> <note_id> <body>" >&2; exit ${SDD_EXIT_VALIDATION}; }
+            [[ $# -ge 4 ]] || { echo "用法: gitlab-api.sh update-mr-note <project_id> <mr_iid> <note_id> <body>" >&2; exit ${SDD_EXIT_VALIDATION}; }
             update_mr_note "$1" "$2" "$3" "$4"
             ;;
         *)
-            _sdd_usage "gitlab-api.sh <action> [args...]"
+            echo "用法: gitlab-api.sh <action> [args...]" >&2
             echo "" >&2
             echo "Actions:" >&2
-            if [[ "${_SDD_LANG}" == "en" ]]; then
-                echo "  parse-issue-url <url>                              Extract project_path and issue_iid from URL" >&2
-                echo "  parse-mr-url <url>                                 Extract project_path and mr_iid from MR URL" >&2
-                echo "  parse-project-url <url>                            Extract project_path from project URL" >&2
-                echo "  resolve-project-id <project_path>                  Get project_id" >&2
-                echo "  get-issue <project_id> <issue_iid>                 Get issue details" >&2
-                echo "  create-issue <pid> <title> <desc> [labels]         Create issue" >&2
-                echo "  get-issue-notes <project_id> <issue_iid>           Get issue comments" >&2
-                echo "  add-issue-note <project_id> <issue_iid> <body>     Add issue comment" >&2
-                echo "  update-issue-labels <project_id> <iid> <add> [rm]  Update labels" >&2
-                echo "  update-issue-description <pid> <iid> <desc>        Update issue description" >&2
-                echo "  create-mr <pid> <source> <target> <title> <desc> [rm_branch]  Create MR" >&2
-                echo "  get-mr <project_id> <mr_iid>                       Get MR details" >&2
-                echo "  get-mr-changes <project_id> <mr_iid>               Get MR changes" >&2
-                echo "  add-mr-note <project_id> <mr_iid> <body>           Add MR comment" >&2
-                echo "  set-mr-reviewers <project_id> <mr_iid> <ids>       Set MR reviewers" >&2
-                echo "  resolve-user-id <project_id> <username>            Get user ID" >&2
-                echo "  get-project-members <project_id>                   Get project members" >&2
-                echo "  close-issue <project_id> <issue_iid>               Close issue" >&2
-                echo "  list-issue-related-mrs <project_id> <issue_iid>    Get issue related MR list" >&2
-                echo "  list-project-mrs <pid> <source> <target> [state]   List MRs by branch" >&2
-                echo "  get-mr-notes <project_id> <mr_iid>                 Get MR comments" >&2
-                echo "  update-mr-note <pid> <mr_iid> <note_id> <body>     Update MR comment" >&2
-                echo "  reopen-issue <project_id> <issue_iid>              Reopen issue" >&2
-                echo "  list-project-issues <pid> [state] [labels]          List project issues" >&2
-                echo "  update-issue-assignees <pid> <iid> <user_ids>      Set issue assignees" >&2
-            else
-                echo "  parse-issue-url <url>                              从 URL 提取 project_path 和 issue_iid" >&2
-                echo "  parse-mr-url <url>                                 从 MR URL 提取 project_path 和 mr_iid" >&2
-                echo "  parse-project-url <url>                            从项目 URL 提取 project_path" >&2
-                echo "  resolve-project-id <project_path>                  获取 project_id" >&2
-                echo "  get-issue <project_id> <issue_iid>                 获取 issue 详情" >&2
-                echo "  create-issue <pid> <title> <desc> [labels]         创建 issue" >&2
-                echo "  get-issue-notes <project_id> <issue_iid>           获取 issue 评论" >&2
-                echo "  add-issue-note <project_id> <issue_iid> <body>     添加 issue 评论" >&2
-                echo "  update-issue-labels <project_id> <iid> <add> [rm]  更新标签" >&2
-                echo "  update-issue-description <pid> <iid> <desc>        更新 issue 描述" >&2
-                echo "  create-mr <pid> <source> <target> <title> <desc> [rm_branch]  创建 MR" >&2
-                echo "  get-mr <project_id> <mr_iid>                       获取 MR 详情" >&2
-                echo "  get-mr-changes <project_id> <mr_iid>               获取 MR 变更" >&2
-                echo "  add-mr-note <project_id> <mr_iid> <body>           添加 MR 评论" >&2
-                echo "  set-mr-reviewers <project_id> <mr_iid> <ids>       设置 MR reviewer" >&2
-                echo "  resolve-user-id <project_id> <username>            获取用户 ID" >&2
-                echo "  get-project-members <project_id>                   获取项目成员" >&2
-                echo "  close-issue <project_id> <issue_iid>               关闭 issue" >&2
-                echo "  list-issue-related-mrs <project_id> <issue_iid>    获取 issue 关联 MR 列表" >&2
-                echo "  list-project-mrs <pid> <source> <target> [state]   按分支查询 MR 列表" >&2
-                echo "  get-mr-notes <project_id> <mr_iid>                 获取 MR 评论列表" >&2
-                echo "  update-mr-note <pid> <mr_iid> <note_id> <body>     更新 MR 评论" >&2
-                echo "  reopen-issue <project_id> <issue_iid>              重新打开 issue" >&2
-                echo "  list-project-issues <pid> [state] [labels]          获取项目 issue 列表" >&2
-                echo "  update-issue-assignees <pid> <iid> <user_ids>      设置 issue 指派人" >&2
-            fi
+            echo "  parse-issue-url <url>                              从 URL 提取 project_path 和 issue_iid" >&2
+            echo "  parse-mr-url <url>                                 从 MR URL 提取 project_path 和 mr_iid" >&2
+            echo "  parse-project-url <url>                            从项目 URL 提取 project_path" >&2
+            echo "  resolve-project-id <project_path>                  获取 project_id" >&2
+            echo "  get-issue <project_id> <issue_iid>                 获取 issue 详情" >&2
+            echo "  create-issue <pid> <title> <desc> [labels]         创建 issue" >&2
+            echo "  get-issue-notes <project_id> <issue_iid>           获取 issue 评论" >&2
+            echo "  add-issue-note <project_id> <issue_iid> <body>     添加 issue 评论" >&2
+            echo "  update-issue-labels <project_id> <iid> <add> [rm]  更新标签" >&2
+            echo "  update-issue-description <pid> <iid> <desc>        更新 issue 描述" >&2
+            echo "  create-mr <pid> <source> <target> <title> <desc> [rm_branch]  创建 MR" >&2
+            echo "  get-mr <project_id> <mr_iid>                       获取 MR 详情" >&2
+            echo "  get-mr-changes <project_id> <mr_iid>               获取 MR 变更" >&2
+            echo "  add-mr-note <project_id> <mr_iid> <body>           添加 MR 评论" >&2
+            echo "  set-mr-reviewers <project_id> <mr_iid> <ids>       设置 MR reviewer" >&2
+            echo "  resolve-user-id <project_id> <username>            获取用户 ID" >&2
+            echo "  get-project-members <project_id>                   获取项目成员" >&2
+            echo "  close-issue <project_id> <issue_iid>               关闭 issue" >&2
+            echo "  list-issue-related-mrs <project_id> <issue_iid>    获取 issue 关联 MR 列表" >&2
+            echo "  list-project-mrs <pid> <source> <target> [state]   按分支查询 MR 列表" >&2
+            echo "  get-mr-notes <project_id> <mr_iid>                 获取 MR 评论列表" >&2
+            echo "  update-mr-note <pid> <mr_iid> <note_id> <body>     更新 MR 评论" >&2
+            echo "  reopen-issue <project_id> <issue_iid>              重新打开 issue" >&2
+            echo "  list-project-issues <pid> [state] [labels]          获取项目 issue 列表" >&2
+            echo "  update-issue-assignees <pid> <iid> <user_ids>      设置 issue 指派人" >&2
             exit ${SDD_EXIT_VALIDATION}
             ;;
     esac

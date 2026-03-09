@@ -57,7 +57,7 @@ gitlab-use
 # Current: alice
 # Available profiles:
 #   * alice  (active)
-#     zhangsan
+#     charlie
 #
 # Commands: gitlab-use <name> | add | remove <name> | info [name]
 ```
@@ -93,15 +93,15 @@ After switching, the following operations in the current shell session will use 
 gitlab-use add
 # === Add New GitLab Profile ===
 #
-# Profile name: zhangsan
+# Profile name: charlie
 # GitLab URL [https://code.gitlab.example.com]:
 # Personal Access Token (api scope): glpat-xxxxxxxxxxxx
-# Verifying Token... ✓ Valid (user: zhangsan)
-# Developer name [zhangsan]:
-# Git email [zhangsan@gitlab.example.com]:
+# Verifying Token... ✓ Valid (user: charlie)
+# Developer name [charlie]:
+# Git email [charlie@gitlab.example.com]:
 #
-# ✓ Profile 'zhangsan' created
-#   Use gitlab-use zhangsan to switch
+# ✓ Profile 'charlie' created
+#   Use gitlab-use charlie to switch
 ```
 
 Interactive guided input with automatic Token validation and username retrieval from the GitLab API.
@@ -109,8 +109,8 @@ Interactive guided input with automatic Token validation and username retrieval 
 ### Remove a Profile
 
 ```bash
-gitlab-use remove zhangsan
-# ✓ Profile 'zhangsan' removed
+gitlab-use remove charlie
+# ✓ Profile 'charlie' removed
 ```
 
 You cannot remove the currently active profile — switch to another profile first before removing.
@@ -129,7 +129,7 @@ gitlab-use info
 ```
 
 ```bash
-gitlab-use info zhangsan    # View a specific profile (does not need to be active)
+gitlab-use info charlie    # View a specific profile (does not need to be active)
 ```
 
 ### Direct Source

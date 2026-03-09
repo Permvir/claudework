@@ -10,13 +10,6 @@ if [[ "${_SDD_CONFIG_LOADED:-}" == "true" && "${1:-}" != "--export" ]]; then
     return 0 2>/dev/null || true
 fi
 
-# ── 语言检测 ──
-if [[ "${LANG:-}" != zh_CN* && "${LANG:-}" != zh_TW* ]]; then
-  _SDD_LANG=en
-else
-  _SDD_LANG=zh
-fi
-
 # 保存环境变量（优先级高于配置文件）
 _env_GITLAB_URL="${GITLAB_URL:-}"
 _env_GITLAB_TOKEN="${GITLAB_TOKEN:-}"
@@ -74,11 +67,7 @@ GITLAB_TOKEN="${GITLAB_TOKEN:-}"
 # 确保 GitLab 域名不走代理（从 GITLAB_URL 提取主机名追加到 no_proxy）
 if [[ -n "${GITLAB_URL}" ]]; then
     if [[ ! "${GITLAB_URL}" =~ ^https?:// ]]; then
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            echo "⚠ SDD: GITLAB_URL format invalid (missing http:// or https:// prefix): ${GITLAB_URL}" >&2
-        else
-            echo "⚠ SDD: GITLAB_URL 格式不正确（缺少 http:// 或 https:// 前缀）: ${GITLAB_URL}" >&2
-        fi
+        echo "⚠ SDD: GITLAB_URL 格式不正确（缺少 http:// 或 https:// 前缀）: ${GITLAB_URL}" >&2
     else
         _gitlab_host="${GITLAB_URL#*://}"  # 去掉 scheme
         _gitlab_host="${_gitlab_host%%/*}"  # 去掉路径
@@ -135,18 +124,10 @@ if [[ "${DEFAULT_BASE_BRANCH}" == "dev" ]] && git rev-parse --is-inside-work-tre
         if _ls_remote_output=$(git ls-remote --heads origin dev 2>&1); then
             if ! echo "${_ls_remote_output}" | grep -q "refs/heads/dev"; then
                 DEFAULT_BASE_BRANCH="master"
-                if [[ "${_SDD_LANG}" == "en" ]]; then
-                    echo "ℹ SDD: No remote dev branch, base branch auto-fallback to master" >&2
-                else
-                    echo "ℹ SDD: 远程无 dev 分支，基线自动回退为 master" >&2
-                fi
+                echo "ℹ SDD: 远程无 dev 分支，基线自动回退为 master" >&2
             fi
         else
-            if [[ "${_SDD_LANG}" == "en" ]]; then
-                echo "⚠ SDD: git ls-remote failed (network or permission issue), keeping DEFAULT_BASE_BRANCH=${DEFAULT_BASE_BRANCH}" >&2
-            else
-                echo "⚠ SDD: git ls-remote 失败（网络或权限问题），保持 DEFAULT_BASE_BRANCH=${DEFAULT_BASE_BRANCH}" >&2
-            fi
+            echo "⚠ SDD: git ls-remote 失败（网络或权限问题），保持 DEFAULT_BASE_BRANCH=${DEFAULT_BASE_BRANCH}" >&2
         fi
         # 原子写入缓存（mktemp + mv 避免并发写入和中断导致文件损坏）
         _cache_tmp=$(mktemp "${_cache_file}.XXXXXX" 2>/dev/null || echo "${_cache_file}.$$")
@@ -177,18 +158,10 @@ MR_SQUASH="${MR_SQUASH:-true}"
 # 如果用户仍配置了旧版 BRANCH_PATTERN，将其作为 dev 类型的默认模式
 if [[ -n "${BRANCH_PATTERN:-}" && "${BRANCH_PATTERN}" != "sdd/{issue_iid}" ]]; then
     if [[ "${BRANCH_PATTERN_DEV}" != '{base_branch}-{developer}-{issue_iid}' ]]; then
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            echo "⚠ SDD: Both BRANCH_PATTERN and BRANCH_PATTERN_DEV are set. Ignoring deprecated BRANCH_PATTERN, using BRANCH_PATTERN_DEV=\"${BRANCH_PATTERN_DEV}\"" >&2
-        else
-            echo "⚠ SDD: 同时配置了 BRANCH_PATTERN 和 BRANCH_PATTERN_DEV，忽略已弃用的 BRANCH_PATTERN，使用 BRANCH_PATTERN_DEV=\"${BRANCH_PATTERN_DEV}\"" >&2
-        fi
+        echo "⚠ SDD: 同时配置了 BRANCH_PATTERN 和 BRANCH_PATTERN_DEV，忽略已弃用的 BRANCH_PATTERN，使用 BRANCH_PATTERN_DEV=\"${BRANCH_PATTERN_DEV}\"" >&2
     else
         BRANCH_PATTERN_DEV="${BRANCH_PATTERN}"
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            echo "⚠ SDD: BRANCH_PATTERN is deprecated, use BRANCH_PATTERN_DEV instead. Compatibility will be removed on 2026-06-01." >&2
-        else
-            echo "⚠ SDD: BRANCH_PATTERN 已弃用，请改用 BRANCH_PATTERN_DEV。该兼容将于 2026-06-01 移除。" >&2
-        fi
+        echo "⚠ SDD: BRANCH_PATTERN 已弃用，请改用 BRANCH_PATTERN_DEV。该兼容将于 2026-06-01 移除。" >&2
     fi
 fi
 
@@ -202,11 +175,7 @@ get_branch_name() {
     local description="${3:-}"
 
     if [[ -z "${DEVELOPER_NAME:-}" ]]; then
-        if [[ "${_SDD_LANG}" == "en" ]]; then
-            echo "Error: git config user.name not set, cannot generate branch name. Please run: git config user.name 'Your Name'" >&2
-        else
-            echo "错误: git config user.name 未设置，无法生成分支名。请先运行: git config user.name '你的名字'" >&2
-        fi
+        echo "错误: git config user.name 未设置，无法生成分支名。请先运行: git config user.name '你的名字'" >&2
         return 1
     fi
 
@@ -283,105 +252,53 @@ fi
 
 # ─── 验证模式 ──────────────────────────────────────────────
 if [[ "${1:-}" == "--export" ]]; then
-    if [[ "${_SDD_LANG}" == "en" ]]; then
-        echo "SDD Workflow Configuration:"
-        echo ""
-        echo "  [GitLab]"
-        echo "  GITLAB_URL              = ${GITLAB_URL}"
-        if [[ -z "${GITLAB_TOKEN}" || "${GITLAB_TOKEN}" == "YOUR_TOKEN_HERE" ]]; then
-            echo "  GITLAB_TOKEN            = Not set"
-        else
-            echo "  GITLAB_TOKEN            = Set (${#GITLAB_TOKEN} chars)"
-        fi
-        echo ""
-        echo "  [Developer]"
-        if [[ -z "${DEVELOPER_NAME:-}" ]]; then
-            echo "  DEVELOPER_NAME          = Not set  ⚠ Please run: git config user.name 'Your Name'"
-        else
-            echo "  DEVELOPER_NAME          = ${DEVELOPER_NAME}"
-        fi
-        echo ""
-        echo "  [Git Branch Management]"
-        echo "  DEFAULT_BASE_BRANCH     = ${DEFAULT_BASE_BRANCH}$(
-            if [[ "${DEFAULT_BASE_BRANCH}" == "master" ]] && git rev-parse --is-inside-work-tree &>/dev/null 2>&1 && ! git rev-parse --verify "refs/remotes/origin/dev" &>/dev/null 2>&1; then
-                echo " (auto-detected: no remote dev branch)"
-            fi
-        )"
-        echo "  DEFAULT_BRANCH_TYPE     = ${DEFAULT_BRANCH_TYPE}"
-        echo "  BRANCH_PATTERN_DEV      = ${BRANCH_PATTERN_DEV}"
-        echo "  BRANCH_PATTERN_HOTFIX   = ${BRANCH_PATTERN_HOTFIX}"
-        echo "  BRANCH_PATTERN_FEATURE  = ${BRANCH_PATTERN_FEATURE}"
-        echo ""
-        echo "  [Example Branch Names]"
-        echo "  dev type    → $(get_branch_name dev 8)"
-        echo "  hotfix type → $(get_branch_name hotfix 8)"
-        echo "  feature type→ $(get_branch_name feature 8)"
-        echo ""
-        echo "  [Workflow Labels]"
-        echo "  WORKFLOW_LABEL_BACKLOG  = ${WORKFLOW_LABEL_BACKLOG}"
-        echo "  WORKFLOW_LABEL_START    = ${WORKFLOW_LABEL_START}"
-        echo "  WORKFLOW_LABEL_DEV      = ${WORKFLOW_LABEL_DEV}"
-        echo "  WORKFLOW_LABEL_EVAL     = ${WORKFLOW_LABEL_EVAL}"
-        echo "  WORKFLOW_LABEL_DONE     = ${WORKFLOW_LABEL_DONE}"
-        echo ""
-        echo "  [MR Settings]"
-        echo "  MR_REMOVE_SOURCE_BRANCH = ${MR_REMOVE_SOURCE_BRANCH}"
-        echo "  MR_SQUASH               = ${MR_SQUASH}"
-
-        if [[ -z "${GITLAB_TOKEN}" || "${GITLAB_TOKEN}" == "YOUR_TOKEN_HERE" ]]; then
-            echo ""
-            echo "⚠ GITLAB_TOKEN not configured. Edit ${USER_CONFIG}"
-            exit 1
-        fi
+    echo "SDD Workflow 配置："
+    echo ""
+    echo "  [GitLab]"
+    echo "  GITLAB_URL              = ${GITLAB_URL}"
+    if [[ -z "${GITLAB_TOKEN}" || "${GITLAB_TOKEN}" == "YOUR_TOKEN_HERE" ]]; then
+        echo "  GITLAB_TOKEN            = 未设置"
     else
-        echo "SDD Workflow 配置："
-        echo ""
-        echo "  [GitLab]"
-        echo "  GITLAB_URL              = ${GITLAB_URL}"
-        if [[ -z "${GITLAB_TOKEN}" || "${GITLAB_TOKEN}" == "YOUR_TOKEN_HERE" ]]; then
-            echo "  GITLAB_TOKEN            = 未设置"
-        else
-            echo "  GITLAB_TOKEN            = 已设置 (${#GITLAB_TOKEN} 字符)"
+        echo "  GITLAB_TOKEN            = 已设置 (${#GITLAB_TOKEN} 字符)"
+    fi
+    echo ""
+    echo "  [开发者]"
+    if [[ -z "${DEVELOPER_NAME:-}" ]]; then
+        echo "  DEVELOPER_NAME          = 未设置  ⚠ 请运行: git config user.name '你的名字'"
+    else
+        echo "  DEVELOPER_NAME          = ${DEVELOPER_NAME}"
+    fi
+    echo ""
+    echo "  [Git 分支管理]"
+    echo "  DEFAULT_BASE_BRANCH     = ${DEFAULT_BASE_BRANCH}$(
+        if [[ "${DEFAULT_BASE_BRANCH}" == "master" ]] && git rev-parse --is-inside-work-tree &>/dev/null 2>&1 && ! git rev-parse --verify "refs/remotes/origin/dev" &>/dev/null 2>&1; then
+            echo " (自动检测: 远程无 dev 分支)"
         fi
-        echo ""
-        echo "  [开发者]"
-        if [[ -z "${DEVELOPER_NAME:-}" ]]; then
-            echo "  DEVELOPER_NAME          = 未设置  ⚠ 请运行: git config user.name '你的名字'"
-        else
-            echo "  DEVELOPER_NAME          = ${DEVELOPER_NAME}"
-        fi
-        echo ""
-        echo "  [Git 分支管理]"
-        echo "  DEFAULT_BASE_BRANCH     = ${DEFAULT_BASE_BRANCH}$(
-            if [[ "${DEFAULT_BASE_BRANCH}" == "master" ]] && git rev-parse --is-inside-work-tree &>/dev/null 2>&1 && ! git rev-parse --verify "refs/remotes/origin/dev" &>/dev/null 2>&1; then
-                echo " (自动检测: 远程无 dev 分支)"
-            fi
-        )"
-        echo "  DEFAULT_BRANCH_TYPE     = ${DEFAULT_BRANCH_TYPE}"
-        echo "  BRANCH_PATTERN_DEV      = ${BRANCH_PATTERN_DEV}"
-        echo "  BRANCH_PATTERN_HOTFIX   = ${BRANCH_PATTERN_HOTFIX}"
-        echo "  BRANCH_PATTERN_FEATURE  = ${BRANCH_PATTERN_FEATURE}"
-        echo ""
-        echo "  [示例分支名]"
-        echo "  dev 类型    → $(get_branch_name dev 8)"
-        echo "  hotfix 类型 → $(get_branch_name hotfix 8)"
-        echo "  feature 类型→ $(get_branch_name feature 8)"
-        echo ""
-        echo "  [Workflow 标签]"
-        echo "  WORKFLOW_LABEL_BACKLOG  = ${WORKFLOW_LABEL_BACKLOG}"
-        echo "  WORKFLOW_LABEL_START    = ${WORKFLOW_LABEL_START}"
-        echo "  WORKFLOW_LABEL_DEV      = ${WORKFLOW_LABEL_DEV}"
-        echo "  WORKFLOW_LABEL_EVAL     = ${WORKFLOW_LABEL_EVAL}"
-        echo "  WORKFLOW_LABEL_DONE     = ${WORKFLOW_LABEL_DONE}"
-        echo ""
-        echo "  [MR 设置]"
-        echo "  MR_REMOVE_SOURCE_BRANCH = ${MR_REMOVE_SOURCE_BRANCH}"
-        echo "  MR_SQUASH               = ${MR_SQUASH}"
+    )"
+    echo "  DEFAULT_BRANCH_TYPE     = ${DEFAULT_BRANCH_TYPE}"
+    echo "  BRANCH_PATTERN_DEV      = ${BRANCH_PATTERN_DEV}"
+    echo "  BRANCH_PATTERN_HOTFIX   = ${BRANCH_PATTERN_HOTFIX}"
+    echo "  BRANCH_PATTERN_FEATURE  = ${BRANCH_PATTERN_FEATURE}"
+    echo ""
+    echo "  [示例分支名]"
+    echo "  dev 类型    → $(get_branch_name dev 8)"
+    echo "  hotfix 类型 → $(get_branch_name hotfix 8)"
+    echo "  feature 类型→ $(get_branch_name feature 8)"
+    echo ""
+    echo "  [Workflow 标签]"
+    echo "  WORKFLOW_LABEL_BACKLOG  = ${WORKFLOW_LABEL_BACKLOG}"
+    echo "  WORKFLOW_LABEL_START    = ${WORKFLOW_LABEL_START}"
+    echo "  WORKFLOW_LABEL_DEV      = ${WORKFLOW_LABEL_DEV}"
+    echo "  WORKFLOW_LABEL_EVAL     = ${WORKFLOW_LABEL_EVAL}"
+    echo "  WORKFLOW_LABEL_DONE     = ${WORKFLOW_LABEL_DONE}"
+    echo ""
+    echo "  [MR 设置]"
+    echo "  MR_REMOVE_SOURCE_BRANCH = ${MR_REMOVE_SOURCE_BRANCH}"
+    echo "  MR_SQUASH               = ${MR_SQUASH}"
 
-        if [[ -z "${GITLAB_TOKEN}" || "${GITLAB_TOKEN}" == "YOUR_TOKEN_HERE" ]]; then
-            echo ""
-            echo "⚠ GITLAB_TOKEN 未配置，请编辑 ${USER_CONFIG}"
-            exit 1
-        fi
+    if [[ -z "${GITLAB_TOKEN}" || "${GITLAB_TOKEN}" == "YOUR_TOKEN_HERE" ]]; then
+        echo ""
+        echo "⚠ GITLAB_TOKEN 未配置，请编辑 ${USER_CONFIG}"
+        exit 1
     fi
 fi

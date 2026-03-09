@@ -77,7 +77,7 @@ Body: {"description": "新的 markdown 描述内容"}
 
 ```json
 {
-  "source_branch": "dev-alice-8",
+  "source_branch": "dev-ocean-8",
   "target_branch": "dev",
   "title": "Resolve \"issue title\"",
   "description": "...",

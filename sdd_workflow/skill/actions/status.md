@@ -1,4 +1,3 @@
-<!-- Purpose: Display current SDD working status overview (branch, issue, local changes). -->
 # Action: status
 
 展示当前 SDD 工作状态概览。
@@ -34,7 +33,7 @@
    ```
    ## SDD 状态
 
-   **分支**: dev-alice-8 (dev 类型)
+   **分支**: dev-ocean-8 (dev 类型)
    **基线**: dev
    **关联 Issue**: #8 — 添加用户头像上传功能
    **工作流阶段**: workflow::in dev

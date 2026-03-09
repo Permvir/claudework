@@ -1,4 +1,3 @@
-<!-- Purpose: Close the issue after MR merge, update label to workflow::done. -->
 # Action: done
 
 MR 合入后关闭 issue，自动更新标签为 `workflow::done`。

@@ -1,4 +1,3 @@
-<!-- Purpose: Discuss open questions/TODOs in an issue, then update the issue description with conclusions. -->
 # Action: refine
 
 读取 issue 中的问题和 TODO 标记，讨论后更新 issue 描述。根据上下文有两种模式：

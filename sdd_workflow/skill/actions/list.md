@@ -1,4 +1,3 @@
-<!-- Purpose: List project issues with workflow:: labels, grouped by workflow stage. -->
 # Action: list
 
 列出当前项目中带 `workflow::` 标签的 issue，按工作流阶段分组展示。

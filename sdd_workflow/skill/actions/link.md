@@ -1,4 +1,3 @@
-<!-- Purpose: Append a related issue URL to the "Related Issues" section of an issue. -->
 # Action: link
 
 向指定 issue 的「关联 Issue」栏目追加一条关联 URL。

@@ -10,7 +10,7 @@ FAIL=0
 # Export required env vars to avoid config errors
 export GITLAB_URL="http://gitlab.example.com"
 export GITLAB_TOKEN="test_token"
-export DEVELOPER_NAME="alice"
+export DEVELOPER_NAME="ocean"
 # Set DEFAULT_BASE_BRANCH to non-"dev" to skip git ls-remote network call
 export DEFAULT_BASE_BRANCH="master"
 

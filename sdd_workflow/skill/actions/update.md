@@ -1,4 +1,3 @@
-<!-- Purpose: Add a structured progress/status comment to the GitLab issue. -->
 # Action: update
 
 向 GitLab Issue 评论区添加一条结构化评论。
